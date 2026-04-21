@@ -1,11 +1,42 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>Power BI Embed App</title>
+    <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
 </head>
 <body>
-    <h1>Power BI Embedded App</h1>
-    <div id="reportContainer"></div>
+
+    <h2>Power BI Embedded Report</h2>
+
+    <div id="reportContainer" style="height:600px;"></div>
+
+    <script>
+        async function loadReport() {
+
+            const response = await fetch("/api/getEmbedToken");
+            const data = await response.json();
+
+            const embedConfig = {
+                type: 'report',
+                tokenType: window['powerbi-client'].models.TokenType.Embed,
+                accessToken: data.accessToken,
+                embedUrl: data.embedUrl,
+                id: data.reportId,
+                settings: {
+                    panes: {
+                        filters: { visible: false },
+                        pageNavigation: { visible: true }
+                    }
+                }
+            };
+
+            const container = document.getElementById("reportContainer");
+
+            powerbi.embed(container, embedConfig);
+        }
+
+        loadReport();
+    </script>
+
 </body>
 </html>
