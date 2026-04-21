@@ -1,5 +1,3 @@
-const fetch = require("node-fetch");
-
 module.exports = async function (context, req) {
 
     const tenantId = process.env.TENANT_ID;
@@ -22,9 +20,14 @@ module.exports = async function (context, req) {
         });
 
         const tokenData = await tokenResponse.json();
+
+        if (!tokenData.access_token) {
+            throw new Error(JSON.stringify(tokenData));
+        }
+
         const accessToken = tokenData.access_token;
 
-        // 2. Get report details
+        // 2. Get report
         const reportResponse = await fetch(
             `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}`,
             {
@@ -59,11 +62,9 @@ module.exports = async function (context, req) {
         };
 
     } catch (error) {
-    context.res = {
-        status: 500,
-        body: {
-            error: error.message,
-            details: error
-        }
-    };
+        context.res = {
+            status: 500,
+            body: error.message
+        };
+    }
 };
