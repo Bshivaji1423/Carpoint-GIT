@@ -1,5 +1,10 @@
-{"routes":[{"route":"/*","allowedRoles":["authenticated"]}]},
 {
+  "routes": [
+    {
+      "route": "/*",
+      "allowedRoles": ["authenticated"]
+    }
+  ],
   "globalHeaders": {
     "Content-Security-Policy": "frame-ancestors https://teams.microsoft.com https://*.teams.microsoft.com https://outlook.office.com https://*.office.com"
   }
