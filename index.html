@@ -3,16 +3,76 @@
 <head>
     <title>Power BI Embed App</title>
     <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .logo {
+            height: 40px;
+        }
+
+        .right {
+            font-size: 14px;
+        }
+
+        .right a {
+            margin-left: 15px;
+            text-decoration: none;
+            color: #0078d4;
+        }
+
+        #reportContainer {
+            height: calc(100vh - 70px);
+        }
+    </style>
 </head>
+
 <body>
 
-    <h2>Power BI Embedded Report</h2>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="left">
+            <img src="/logo.png" class="logo">
+        </div>
+        <div class="right">
+            <span id="username">Loading...</span>
+            <a href="/.auth/logout">Logout</a>
+        </div>
+    </div>
 
-    <div id="reportContainer" style="height:600px;"></div>
+    <!-- REPORT -->
+    <div id="reportContainer"></div>
 
     <script>
-        async function loadReport() {
+        async function loadUser() {
+            try {
+                const response = await fetch('/.auth/me');
+                const data = await response.json();
 
+                if (data.clientPrincipal) {
+                    document.getElementById("username").innerText =
+                        data.clientPrincipal.userDetails;
+                } else {
+                    document.getElementById("username").innerText = "Not logged in";
+                }
+            } catch {
+                document.getElementById("username").innerText = "Error";
+            }
+        }
+
+        async function loadReport() {
             const response = await fetch("/api/getEmbedToken");
             const data = await response.json();
 
@@ -31,10 +91,10 @@
             };
 
             const container = document.getElementById("reportContainer");
-
             powerbi.embed(container, embedConfig);
         }
 
+        loadUser();
         loadReport();
     </script>
 
