@@ -1,17 +1,20 @@
 {
   "routes": [
     {
-      "route": "/*",
+      "route": "/api/*",
       "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/*",
+      "allowedRoles": ["anonymous", "authenticated"]
     }
   ],
   "responseOverrides": {
     "401": {
-      "rewrite": "/.auth/login/aad"
+      "redirect": "/.auth/login/aad"
     }
   },
   "globalHeaders": {
-    "Content-Security-Policy": "frame-ancestors https://teams.microsoft.com https://*.teams.microsoft.com https://outlook.office.com https://*.office.com",
-    "X-Frame-Options": "ALLOW-FROM https://teams.microsoft.com"
+    "Content-Security-Policy": "frame-ancestors https://teams.microsoft.com https://*.teams.microsoft.com https://outlook.office.com https://*.office.com"
   }
 }
