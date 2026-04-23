@@ -44,6 +44,7 @@
         #reportContainer {
             width: 100%;
             height: calc(100vh - 70px);
+            overflow: hidden;
         }
     </style>
 </head>
@@ -98,10 +99,7 @@
                         filters: { visible: false },
                         pageNavigation: { visible: false }
                     },
-                    layoutType: models.LayoutType.Custom,
-                    customLayout: {
-                        displayOption: models.DisplayOption.FitToWidth
-                    }
+                    layoutType: models.LayoutType.FitToPage
                 }
             };
 
