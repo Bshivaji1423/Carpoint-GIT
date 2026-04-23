@@ -5,7 +5,13 @@
       "allowedRoles": ["authenticated"]
     }
   ],
+  "responseOverrides": {
+    "401": {
+      "rewrite": "/.auth/login/aad"
+    }
+  },
   "globalHeaders": {
-    "Content-Security-Policy": "frame-ancestors https://teams.microsoft.com https://*.teams.microsoft.com https://outlook.office.com https://*.office.com"
+    "Content-Security-Policy": "frame-ancestors https://teams.microsoft.com https://*.teams.microsoft.com https://outlook.office.com https://*.office.com",
+    "X-Frame-Options": "ALLOW-FROM https://teams.microsoft.com"
   }
 }
