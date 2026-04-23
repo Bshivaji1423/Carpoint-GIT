@@ -6,7 +6,7 @@
     },
     {
       "route": "/*",
-      "allowedRoles": ["anonymous", "authenticated"]
+      "allowedRoles": ["authenticated"]
     }
   ],
   "responseOverrides": {
