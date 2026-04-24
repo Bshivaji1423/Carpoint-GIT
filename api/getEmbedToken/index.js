@@ -21,7 +21,24 @@ module.exports = async function (context, req) {
         }
 
         if (!userEmail) {
-            throw new Error("User not authenticated");
+            context.res = {
+                status: 401,
+                body: "User not authenticated"
+            };
+            return;
+        }
+
+        // -------------------------------
+        // ✅ 1.1 Restrict domain
+        // -------------------------------
+        const email = userEmail.toLowerCase();
+
+        if (!email.endsWith("@carpoint.it")) {
+            context.res = {
+                status: 403,
+                body: "Access denied: only @carpoint.it accounts allowed"
+            };
+            return;
         }
 
         // -------------------------------
@@ -77,8 +94,8 @@ module.exports = async function (context, req) {
                     accessLevel: "View",
                     identities: [
                         {
-                            username: userEmail,
-                            roles: ["Sales_Role"], // MUST match Power BI role name
+                            username: email,
+                            roles: ["Sales_Role"], // must match Power BI role
                             datasets: [reportData.datasetId]
                         }
                     ]
