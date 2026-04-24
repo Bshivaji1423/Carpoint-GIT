@@ -63,8 +63,8 @@
 
     <div class="right">
         <span id="username">Loading...</span>
-        <button onclick="login()">Login</button>
-        <button onclick="logout()">Logout</button>
+        <button id="loginBtn" onclick="login()" style="display:none;">Login</button>
+        <button id="logoutBtn" onclick="logout()" style="display:none;">Logout</button>
     </div>
 </div>
 
@@ -90,10 +90,15 @@
     // =============================
     async function login() {
         try {
-            await msalInstance.loginPopup({
+            const response = await msalInstance.loginPopup({
                 scopes: ["User.Read"]
             });
-            location.reload();
+    
+            // Set active account
+            msalInstance.setActiveAccount(response.account);
+    
+            loadUser(); // update UI directly
+    
         } catch (err) {
             console.error(err);
         }
@@ -103,23 +108,44 @@
     // LOGOUT
     // =============================
     function logout() {
-        msalInstance.logoutPopup();
+        msalInstance.logoutPopup().then(() => {
+            location.reload();
+        });
     }
 
     // =============================
     // LOAD USER
     // =============================
     function loadUser() {
-        const accounts = msalInstance.getAllAccounts();
-
-        if (accounts.length > 0) {
-            const user = accounts[0];
-            document.getElementById("username").innerText = user.username;
-
-            // Load report ONLY if logged in
+    
+        let account = msalInstance.getActiveAccount();
+    
+        if (!account) {
+            const accounts = msalInstance.getAllAccounts();
+            if (accounts.length > 0) {
+                account = accounts[0];
+                msalInstance.setActiveAccount(account);
+            }
+        }
+    
+        const loginBtn = document.getElementById("loginBtn");
+        const logoutBtn = document.getElementById("logoutBtn");
+    
+        if (account) {
+    
+            document.getElementById("username").innerText = account.username;
+    
+            loginBtn.style.display = "none";
+            logoutBtn.style.display = "inline-block";
+    
             loadReport();
+    
         } else {
+    
             document.getElementById("username").innerText = "Not logged in";
+    
+            loginBtn.style.display = "inline-block";
+            logoutBtn.style.display = "none";
         }
     }
 
@@ -129,10 +155,21 @@
     async function loadReport() {
         try {
             const response = await fetch("/api/getEmbedToken");
+    
+            if (!response.ok) {
+                const text = await response.text();
+                console.error("API error:", text);
+    
+                document.getElementById("reportContainer").innerHTML =
+                    "<h3 style='padding:20px'>Access denied</h3>";
+    
+                return;
+            }
+    
             const data = await response.json();
-
+    
             const models = window['powerbi-client'].models;
-
+    
             const embedConfig = {
                 type: 'report',
                 tokenType: models.TokenType.Embed,
@@ -147,17 +184,21 @@
                     layoutType: models.LayoutType.FitToPage
                 }
             };
-
+    
             const container = document.getElementById("reportContainer");
+    
+            powerbi.reset(container);
             powerbi.embed(container, embedConfig);
-
+    
         } catch (err) {
             console.error("Report load failed:", err);
         }
     }
 
     // INIT
-    loadUser();
+    msalInstance.initialize().then(() => {
+        loadUser();
+    });
 
 </script>
 
