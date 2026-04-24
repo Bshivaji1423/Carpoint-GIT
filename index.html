@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+
     <title>Inevaso Report</title>
 
     <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
@@ -14,20 +16,19 @@
             font-family: Arial;
         }
 
-        /* HIDDEN BY DEFAULT */
         #app {
             display: none;
             height: 100%;
         }
 
-        /* ACCESS DENIED SCREEN */
         #denied {
             display: none;
-            height: 100%;
+            height: 100vh;
             justify-content: center;
             align-items: center;
-            font-size: 24px;
-            font-weight: bold;
+            flex-direction: column;
+            background: #f5f6fa;
+            text-align: center;
         }
 
         .header {
@@ -64,7 +65,30 @@
 
 <!-- 🔴 ACCESS DENIED -->
 <div id="denied">
-    ⛔ Access Denied
+
+    <img src="/logo_carpoint.png" style="height:60px; margin-bottom:20px;">
+
+    <h2 style="color:#1f4e79;">
+        ⛔ Access Denied
+    </h2>
+
+    <p style="color:#555; max-width:400px;">
+        This application is restricted to Carpoint users only.<br>
+        Please sign in using your <b>@carpoint.it</b> account.
+    </p>
+
+    <a href="/.auth/login/aad?prompt=select_account"
+       style="
+        margin-top:20px;
+        padding:10px 18px;
+        background:#1f4e79;
+        color:white;
+        text-decoration:none;
+        font-weight:bold;
+       ">
+        Login with correct account
+    </a>
+
 </div>
 
 <!-- ✅ FULL APP -->
@@ -96,18 +120,16 @@ init();
 async function init() {
 
     try {
-        const userRes = await fetch('/.auth/me');
-        const userData = await userRes.json();
+        const res = await fetch('/.auth/me');
+        const data = await res.json();
 
-        // Not logged in
-        if (!userData.clientPrincipal) {
+        if (!data.clientPrincipal) {
             showDenied();
             return;
         }
 
-        const userEmail = userData.clientPrincipal.userDetails.toLowerCase();
+        const userEmail = data.clientPrincipal.userDetails.toLowerCase();
 
-        // 🔴 BLOCK EXTERNAL USERS HERE (frontend guard)
         if (!userEmail.endsWith("@carpoint.it")) {
             showDenied();
             return;
@@ -117,7 +139,6 @@ async function init() {
         document.getElementById("app").style.display = "block";
         document.getElementById("username").innerText = userEmail;
 
-        // Load report
         loadReport();
 
     } catch (err) {
