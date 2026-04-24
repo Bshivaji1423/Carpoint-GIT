@@ -2,7 +2,6 @@
 <html>
 <head>
     <meta charset="UTF-8">
-
     <title>Inevaso Report</title>
 
     <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
@@ -16,11 +15,13 @@
             font-family: Arial;
         }
 
+        /* APP */
         #app {
             display: none;
             height: 100%;
         }
 
+        /* ACCESS DENIED */
         #denied {
             display: none;
             height: 100vh;
@@ -45,8 +46,13 @@
             height: 40px;
         }
 
-        .right a {
-            margin-left: 10px;
+        .right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn {
             padding: 6px 10px;
             background: white;
             color: #1f4e79;
@@ -63,14 +69,19 @@
 
 <body>
 
-<!-- 🔴 ACCESS DENIED -->
+<!-- 🔴 ACCESS DENIED (NO HEADER) -->
 <div id="denied">
 
-    <img src="/logo_carpoint.png" style="height:60px; margin-bottom:20px;">
+    <div style="
+        background:#1f4e79;
+        padding:12px 20px;
+        border-radius:6px;
+        margin-bottom:20px;
+    ">
+        <img src="/logo_carpoint.png" style="height:40px;">
+    </div>
 
-    <h2 style="color:#1f4e79;">
-        ⛔ Access Denied
-    </h2>
+    <h2 style="color:#1f4e79;">Access Denied</h2>
 
     <p style="color:#555; max-width:400px;">
         This application is restricted to Carpoint users only.<br>
@@ -78,20 +89,14 @@
     </p>
 
     <a href="/.auth/login/aad?prompt=select_account"
-       style="
-        margin-top:20px;
-        padding:10px 18px;
-        background:#1f4e79;
-        color:white;
-        text-decoration:none;
-        font-weight:bold;
-       ">
+       class="btn"
+       style="margin-top:20px; background:#1f4e79; color:white;">
         Login with correct account
     </a>
 
 </div>
 
-<!-- ✅ FULL APP -->
+<!-- ✅ APP -->
 <div id="app">
 
     <div class="header">
@@ -99,14 +104,10 @@
 
         <div class="right">
             <span id="username"></span>
-        
-            <a id="loginBtn"
-               href="/.auth/login/aad?tenantId=1113460a-1574-4516-95b0-02c76e168800">
-                Login
-            </a>
-        
+
             <a id="logoutBtn"
-               href="/.auth/logout?post_logout_redirect_uri=/logged-out.html">
+               href="/.auth/logout?post_logout_redirect_uri=/logged-out.html"
+               class="btn">
                 Logout
             </a>
         </div>
@@ -127,19 +128,21 @@ async function init() {
         const res = await fetch('/.auth/me');
         const data = await res.json();
 
+        // 🔴 NOT LOGGED IN → REDIRECT TO MICROSOFT LOGIN
         if (!data.clientPrincipal) {
-            showDenied();
+            window.location.href = "/.auth/login/aad";
             return;
         }
 
         const userEmail = data.clientPrincipal.userDetails.toLowerCase();
 
+        // 🔴 EXTERNAL USER
         if (!userEmail.endsWith("@carpoint.it")) {
             showDenied();
             return;
         }
 
-        // ✅ SHOW APP
+        // ✅ INTERNAL USER
         document.getElementById("app").style.display = "block";
         document.getElementById("username").innerText = userEmail;
 
