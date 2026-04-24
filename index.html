@@ -15,8 +15,7 @@
             padding: 0;
             width: 100%;
             height: 100%;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: Arial;
         }
 
         .header {
@@ -25,30 +24,20 @@
             justify-content: space-between;
             align-items: center;
             padding: 0 20px;
-            background: linear-gradient(90deg, #1f4e79, #2b6cb0);
+            background: #1f4e79;
             color: white;
         }
 
-        .logo {
-            height: 40px;
-        }
-
-        .right {
-            font-size: 14px;
-        }
+        .logo { height: 40px; }
 
         .right button {
-            margin-left: 15px;
+            margin-left: 10px;
             padding: 6px 10px;
             border: none;
-            background: white;
-            color: #1f4e79;
             cursor: pointer;
-            font-weight: bold;
         }
 
         #reportContainer {
-            width: 100%;
             height: calc(100vh - 70px);
         }
     </style>
@@ -57,11 +46,9 @@
 <body>
 
 <div class="header">
-    <div class="left">
-        <img src="/logo_carpoint.png" class="logo">
-    </div>
+    <img src="/logo_carpoint.png" class="logo">
 
-    <div class="right">
+    <div>
         <span id="username">Loading...</span>
         <button id="loginBtn" onclick="login()" style="display:none;">Login</button>
         <button id="logoutBtn" onclick="logout()" style="display:none;">Logout</button>
@@ -72,139 +59,124 @@
 
 <script>
 
-    // =============================
-    // CONFIG
-    // =============================
-    const msalConfig = {
-        auth: {
-            clientId: "0ce2d6b1-f1fc-4d5a-8f14-ea99c6a2cca4",
-            authority: "https://login.microsoftonline.com/1113460a-1574-4516-95b0-02c76e168800",
-            redirectUri: window.location.origin
-        }
-    };
-
-    const msalInstance = new msal.PublicClientApplication(msalConfig);
-
-    let reportLoaded = false;
-
-    // =============================
-    // LOGIN
-    // =============================
-    async function login() {
-        try {
-            const response = await msalInstance.loginPopup({
-                scopes: ["User.Read"]
-            });
-
-            msalInstance.setActiveAccount(response.account);
-
-            loadUser();
-
-        } catch (err) {
-            console.error("Login error:", err);
-        }
+const msalConfig = {
+    auth: {
+        clientId: "0ce2d6b1-f1fc-4d5a-8f14-ea99c6a2cca4",
+        authority: "https://login.microsoftonline.com/1113460a-1574-4516-95b0-02c76e168800",
+        redirectUri: window.location.origin
     }
+};
 
-    // =============================
-    // LOGOUT
-    // =============================
-    function logout() {
-        msalInstance.logoutPopup().then(() => {
-            location.reload();
-        });
-    }
+const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-    // =============================
-    // LOAD USER
-    // =============================
-    function loadUser() {
+let reportLoaded = false;
 
-        let account = msalInstance.getActiveAccount();
-
-        if (!account) {
-            const accounts = msalInstance.getAllAccounts();
-            if (accounts.length > 0) {
-                account = accounts[0];
-                msalInstance.setActiveAccount(account);
-            }
-        }
-
-        const loginBtn = document.getElementById("loginBtn");
-        const logoutBtn = document.getElementById("logoutBtn");
-
-        if (account) {
-
-            document.getElementById("username").innerText = account.username;
-
-            loginBtn.style.display = "none";
-            logoutBtn.style.display = "inline-block";
-
-            if (!reportLoaded) {
-                reportLoaded = true;
-                loadReport();
-            }
-
-        } else {
-
-            document.getElementById("username").innerText = "Not logged in";
-
-            loginBtn.style.display = "inline-block";
-            logoutBtn.style.display = "none";
-        }
-    }
-
-    // =============================
-    // LOAD REPORT
-    // =============================
-    async function loadReport() {
-        try {
-            const response = await fetch("/api/getEmbedToken");
-
-            if (!response.ok) {
-                const text = await response.text();
-                console.error("API error:", text);
-
-                document.getElementById("reportContainer").innerHTML =
-                    "<h3 style='padding:20px'>Access denied</h3>";
-
-                return;
-            }
-
-            const data = await response.json();
-
-            const models = window['powerbi-client'].models;
-
-            const embedConfig = {
-                type: 'report',
-                tokenType: models.TokenType.Embed,
-                accessToken: data.accessToken,
-                embedUrl: data.embedUrl,
-                id: data.reportId,
-                settings: {
-                    panes: {
-                        filters: { visible: false },
-                        pageNavigation: { visible: false }
-                    },
-                    layoutType: models.LayoutType.FitToPage
-                }
-            };
-
-            const container = document.getElementById("reportContainer");
-
-            powerbi.reset(container);
-            powerbi.embed(container, embedConfig);
-
-        } catch (err) {
-            console.error("Report load failed:", err);
-        }
-    }
-
-    // =============================
-    // INIT
-    // =============================
-    msalInstance.initialize().then(() => {
-        loadUser();
+// ================= LOGIN =================
+function login() {
+    msalInstance.loginRedirect({
+        scopes: ["User.Read"]
     });
+}
+
+// ================= LOGOUT =================
+function logout() {
+    msalInstance.logoutRedirect({
+        postLogoutRedirectUri: window.location.origin
+    });
+}
+
+// ================= LOAD USER =================
+function loadUser() {
+
+    let account = msalInstance.getActiveAccount();
+
+    if (!account) {
+        const accounts = msalInstance.getAllAccounts();
+        if (accounts.length > 0) {
+            account = accounts[0];
+            msalInstance.setActiveAccount(account);
+        }
+    }
+
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    if (account) {
+        document.getElementById("username").innerText = account.username;
+
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+
+        if (!reportLoaded) {
+            reportLoaded = true;
+            loadReport(account);
+        }
+
+    } else {
+        document.getElementById("username").innerText = "Not logged in";
+
+        loginBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+    }
+}
+
+// ================= LOAD REPORT =================
+async function loadReport(account) {
+
+    try {
+
+        const tokenResponse = await msalInstance.acquireTokenSilent({
+            scopes: ["User.Read"],
+            account: account
+        });
+
+        const response = await fetch("/api/getEmbedToken", {
+            headers: {
+                Authorization: `Bearer ${tokenResponse.accessToken}`
+            }
+        });
+
+        if (!response.ok) {
+            document.getElementById("reportContainer").innerHTML =
+                "<h3 style='padding:20px'>Access denied</h3>";
+            return;
+        }
+
+        const data = await response.json();
+
+        const models = window['powerbi-client'].models;
+
+        const embedConfig = {
+            type: 'report',
+            tokenType: models.TokenType.Embed,
+            accessToken: data.accessToken,
+            embedUrl: data.embedUrl,
+            id: data.reportId
+        };
+
+        const container = document.getElementById("reportContainer");
+        powerbi.reset(container);
+        powerbi.embed(container, embedConfig);
+
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// ================= INIT =================
+msalInstance.initialize().then(() => {
+
+    msalInstance.handleRedirectPromise().then((response) => {
+
+        if (response) {
+            msalInstance.setActiveAccount(response.account);
+        }
+
+        loadUser();
+
+    });
+
+});
 
 </script>
 
