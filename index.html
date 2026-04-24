@@ -2,7 +2,12 @@
 <html>
 <head>
     <title>Inevaso Report</title>
+
+    <!-- Power BI -->
     <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
+
+    <!-- MSAL -->
+    <script src="https://alcdn.msauth.net/browser/2.37.0/js/msal-browser.min.js"></script>
 
     <style>
         html, body {
@@ -14,7 +19,6 @@
             font-family: Arial, sans-serif;
         }
 
-        /* HEADER */
         .header {
             height: 70px;
             display: flex;
@@ -33,59 +37,97 @@
             font-size: 14px;
         }
 
-        .right a {
+        .right button {
             margin-left: 15px;
-            text-decoration: none;
-            color: #ffffff;
+            padding: 6px 10px;
+            border: none;
+            background: white;
+            color: #1f4e79;
+            cursor: pointer;
             font-weight: bold;
         }
 
-        /* REPORT FULLSCREEN */
         #reportContainer {
             width: 100%;
             height: calc(100vh - 70px);
-            overflow: hidden;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- HEADER -->
-    <div class="header">
-        <div class="left">
-            <img src="/logo_carpoint.png" class="logo">
-        </div>
-        <div class="right">
-            <span id="username">Loading...</span>
-            <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html">
-                Logout
-            </a>
-            
-        </div>
+<div class="header">
+    <div class="left">
+        <img src="/logo_carpoint.png" class="logo">
     </div>
 
-    <!-- REPORT -->
-    <div id="reportContainer"></div>
+    <div class="right">
+        <span id="username">Loading...</span>
+        <button onclick="login()">Login</button>
+        <button onclick="logout()">Logout</button>
+    </div>
+</div>
 
-    <script>
-        async function loadUser() {
-            try {
-                const response = await fetch('/.auth/me');
-                const data = await response.json();
+<div id="reportContainer"></div>
 
-                if (data.clientPrincipal) {
-                    document.getElementById("username").innerText =
-                        data.clientPrincipal.userDetails;
-                } else {
-                    document.getElementById("username").innerText = "Not logged in";
-                }
-            } catch {
-                document.getElementById("username").innerText = "Error";
-            }
+<script>
+
+    // =============================
+    // MSAL CONFIG
+    // =============================
+    const msalConfig = {
+        auth: {
+            clientId: "0ce2d6b1-f1fc-4d5a-8f14-ea99c6a2cca4", // your client ID
+            authority: "https://login.microsoftonline.com/1113460a-1574-4516-95b0-02c76e168800",
+            redirectUri: window.location.origin
         }
+    };
 
-        async function loadReport() {
+    const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+    // =============================
+    // LOGIN
+    // =============================
+    async function login() {
+        try {
+            await msalInstance.loginPopup({
+                scopes: ["User.Read"]
+            });
+            location.reload();
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    // =============================
+    // LOGOUT
+    // =============================
+    function logout() {
+        msalInstance.logoutPopup();
+    }
+
+    // =============================
+    // LOAD USER
+    // =============================
+    function loadUser() {
+        const accounts = msalInstance.getAllAccounts();
+
+        if (accounts.length > 0) {
+            const user = accounts[0];
+            document.getElementById("username").innerText = user.username;
+
+            // Load report ONLY if logged in
+            loadReport();
+        } else {
+            document.getElementById("username").innerText = "Not logged in";
+        }
+    }
+
+    // =============================
+    // LOAD POWER BI REPORT
+    // =============================
+    async function loadReport() {
+        try {
             const response = await fetch("/api/getEmbedToken");
             const data = await response.json();
 
@@ -108,11 +150,16 @@
 
             const container = document.getElementById("reportContainer");
             powerbi.embed(container, embedConfig);
-        }
 
-        loadUser();
-        loadReport();
-    </script>
+        } catch (err) {
+            console.error("Report load failed:", err);
+        }
+    }
+
+    // INIT
+    loadUser();
+
+</script>
 
 </body>
 </html>
