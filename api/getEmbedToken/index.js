@@ -1,172 +1,139 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Inevaso Report</title>
+module.exports = async function (context, req) {
 
-    <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
-
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            font-family: Arial;
-        }
-
-        /* HIDDEN BY DEFAULT */
-        #app {
-            display: none;
-            height: 100%;
-        }
-
-        /* ACCESS DENIED SCREEN */
-        #denied {
-            display: none;
-            height: 100%;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            font-weight: bold;
-        }
-
-        .header {
-            height: 70px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 20px;
-            background: linear-gradient(90deg, #1f4e79, #2b6cb0);
-            color: white;
-        }
-
-        .logo {
-            height: 40px;
-        }
-
-        .right a {
-            margin-left: 10px;
-            padding: 6px 10px;
-            background: white;
-            color: #1f4e79;
-            text-decoration: none;
-            font-weight: bold;
-        }
-
-        #reportContainer {
-            width: 100%;
-            height: calc(100vh - 70px);
-        }
-    </style>
-</head>
-
-<body>
-
-<!-- 🔴 ACCESS DENIED -->
-<div id="denied">
-    ⛔ Access Denied
-</div>
-
-<!-- ✅ FULL APP -->
-<div id="app">
-
-    <div class="header">
-        <img src="/logo_carpoint.png" class="logo">
-
-        <div class="right">
-            <span id="username"></span>
-
-            <a href="/.auth/login/aad?tenantId=1113460a-1574-4516-95b0-02c76e168800">Login</a>
-
-            <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html">
-                Logout
-            </a>
-        </div>
-    </div>
-
-    <div id="reportContainer"></div>
-
-</div>
-
-<script>
-
-// ================= INIT =================
-init();
-
-async function init() {
+    const tenantId = process.env.TENANT_ID;
+    const clientId = process.env.CLIENT_ID;
+    const clientSecret = process.env.CLIENT_SECRET;
+    const workspaceId = process.env.WORKSPACE_ID;
+    const reportId = process.env.REPORT_ID;
 
     try {
-        const userRes = await fetch('/.auth/me');
-        const userData = await userRes.json();
 
-        // Not logged in
-        if (!userData.clientPrincipal) {
-            showDenied();
+        // ================================
+        // 1. Get logged-in user (SWA)
+        // ================================
+        const principal = req.headers["x-ms-client-principal"];
+
+        if (!principal) {
+            context.res = {
+                status: 401,
+                body: "User not authenticated"
+            };
             return;
         }
 
-        const userEmail = userData.clientPrincipal.userDetails.toLowerCase();
+        const decoded = JSON.parse(
+            Buffer.from(principal, "base64").toString("ascii")
+        );
 
-        // 🔴 BLOCK EXTERNAL USERS HERE (frontend guard)
+        const userEmail = decoded.userDetails?.toLowerCase();
+
+        context.log("User:", userEmail);
+
+        if (!userEmail) {
+            context.res = {
+                status: 401,
+                body: "Invalid user"
+            };
+            return;
+        }
+
+        // ================================
+        // 2. BLOCK external users
+        // ================================
         if (!userEmail.endsWith("@carpoint.it")) {
-            showDenied();
+            context.res = {
+                status: 403,
+                body: "Access denied"
+            };
             return;
         }
 
-        // ✅ SHOW APP
-        document.getElementById("app").style.display = "block";
-        document.getElementById("username").innerText = userEmail;
+        // ================================
+        // 3. Get Power BI access token
+        // ================================
+        const tokenResponse = await fetch(
+            `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    grant_type: "client_credentials",
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    scope: "https://analysis.windows.net/powerbi/api/.default"
+                })
+            }
+        );
 
-        // Load report
-        loadReport();
+        const tokenData = await tokenResponse.json();
 
-    } catch (err) {
-        console.error(err);
-        showDenied();
-    }
-}
-
-// ================= LOAD REPORT =================
-async function loadReport() {
-
-    try {
-        const response = await fetch("/api/getEmbedToken");
-
-        if (!response.ok) {
-            showDenied();
-            return;
+        if (!tokenData.access_token) {
+            throw new Error(JSON.stringify(tokenData));
         }
 
-        const data = await response.json();
+        const accessToken = tokenData.access_token;
 
-        const models = window['powerbi-client'].models;
+        // ================================
+        // 4. Get report info
+        // ================================
+        const reportResponse = await fetch(
+            `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}`,
+            {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            }
+        );
 
-        const config = {
-            type: 'report',
-            tokenType: models.TokenType.Embed,
-            accessToken: data.accessToken,
-            embedUrl: data.embedUrl,
-            id: data.reportId
+        const reportData = await reportResponse.json();
+
+        // ================================
+        // 5. Generate embed token
+        // ================================
+        const embedTokenResponse = await fetch(
+            `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}/GenerateToken`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    accessLevel: "View",
+                    identities: [
+                        {
+                            username: userEmail,
+                            roles: ["Sales_Role"],   // keep only if using RLS
+                            datasets: [reportData.datasetId]
+                        }
+                    ]
+                })
+            }
+        );
+
+        const embedData = await embedTokenResponse.json();
+
+        if (!embedData.token) {
+            throw new Error(JSON.stringify(embedData));
+        }
+
+        // ================================
+        // 6. Return to frontend
+        // ================================
+        context.res = {
+            status: 200,
+            body: {
+                embedUrl: reportData.embedUrl,
+                accessToken: embedData.token,
+                reportId: reportId
+            }
         };
 
-        const container = document.getElementById("reportContainer");
+    } catch (error) {
 
-        powerbi.reset(container);
-        powerbi.embed(container, config);
+        context.log("ERROR:", error.message);
 
-    } catch (err) {
-        console.error(err);
-        showDenied();
+        context.res = {
+            status: 500,
+            body: error.message
+        };
     }
-}
-
-// ================= ACCESS DENIED =================
-function showDenied() {
-    document.getElementById("denied").style.display = "flex";
-    document.getElementById("app").style.display = "none";
-}
-
-</script>
-
-</body>
-</html>
+};
