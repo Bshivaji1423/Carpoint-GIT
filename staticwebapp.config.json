@@ -1,6 +1,10 @@
 {
   "routes": [
     {
+      "route": "/logged-out.html",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["authenticated"]
     },
@@ -13,8 +17,5 @@
     "401": {
       "redirect": "/.auth/login/aad"
     }
-  },
-  "globalHeaders": {
-    "Content-Security-Policy": "frame-ancestors https://teams.microsoft.com https://*.teams.microsoft.com https://outlook.office.com https://*.office.com"
   }
 }
