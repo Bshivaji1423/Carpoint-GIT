@@ -1,23 +1,37 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Status</title>
 
     <style>
         body {
             font-family: Arial;
-            text-align: center;
             margin: 0;
             background-color: #f5f6fa;
         }
 
+        .wrapper {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
         .container {
-            margin-top: 120px;
+            text-align: center;
+        }
+
+        .logo-box {
+            background: #1f4e79;
+            display: inline-block;
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 25px;
         }
 
         .logo {
-            height: 60px;
-            margin-bottom: 20px;
+            height: 40px;
         }
 
         h2 {
@@ -29,18 +43,22 @@
             color: #555;
             margin-bottom: 25px;
             font-size: 16px;
+            max-width: 420px;
         }
 
-        button {
+        .btn {
             padding: 10px 18px;
             background-color: #1f4e79;
             color: white;
             border: none;
-            cursor: pointer;
+            text-decoration: none;
             font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            display: inline-block;
         }
 
-        button:hover {
+        .btn:hover {
             background-color: #163a5c;
         }
     </style>
@@ -48,16 +66,22 @@
 
 <body>
 
-<div class="container">
+<div class="wrapper">
+    <div class="container">
 
-    <!-- ✅ LOGO -->
-    <img src="/logo_carpoint.png" class="logo">
+        <!-- LOGO -->
+        <div class="logo-box">
+            <img src="/logo_carpoint.png" class="logo">
+        </div>
 
-    <h2 id="title">Loading...</h2>
-    <p id="message"></p>
+        <h2 id="title">Loading...</h2>
+        <p id="message"></p>
 
-    <button onclick="login()">Login</button>
+        <a href="/.auth/login/aad?prompt=select_account" class="btn">
+            Login
+        </a>
 
+    </div>
 </div>
 
 <script>
@@ -66,17 +90,13 @@
     const reason = params.get("reason");
 
     if (reason === "external") {
-        document.getElementById("title").innerText = "⛔ Access Denied";
+        document.getElementById("title").innerText = "Access Denied";
         document.getElementById("message").innerText =
-            "This application is available only for authorized Carpoint users.";
+            "This application is restricted to Carpoint users only. Please sign in using your @carpoint.it account.";
     } else {
         document.getElementById("title").innerText = "Logged Out";
         document.getElementById("message").innerText =
             "You have successfully logged out.";
-    }
-
-    function login() {
-        window.location.href = "/.auth/login/aad?prompt=select_account";
     }
 
 </script>
