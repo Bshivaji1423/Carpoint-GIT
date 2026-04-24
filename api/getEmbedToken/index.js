@@ -9,7 +9,7 @@ module.exports = async function (context, req) {
     try {
 
         // -------------------------------
-        // 1. Get logged-in user (for RLS)
+        // 1. Get logged-in user
         // -------------------------------
         const userHeader = req.headers["x-ms-client-principal"];
         let userEmail = null;
@@ -17,8 +17,19 @@ module.exports = async function (context, req) {
         if (userHeader) {
             const decoded = Buffer.from(userHeader, "base64").toString("ascii");
             const user = JSON.parse(decoded);
-            userEmail = user.userDetails;
+
+            const claims = user.claims || [];
+
+            const preferred = claims.find(c => c.typ === "preferred_username")?.val;
+            const email = claims.find(c =>
+                c.typ === "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+            )?.val;
+
+            userEmail = (email || preferred || "").toLowerCase();
         }
+
+        // Debug log (VERY useful)
+        context.log("User email detected:", userEmail);
 
         if (!userEmail) {
             context.res = {
@@ -29,11 +40,11 @@ module.exports = async function (context, req) {
         }
 
         // -------------------------------
-        // ✅ 1.1 Restrict domain
+        // 2. Restrict access (DOMAIN)
         // -------------------------------
-        const email = userEmail.toLowerCase();
+        if (!userEmail.includes("@carpoint.it")) {
+            context.log("Access denied for:", userEmail);
 
-        if (!email.endsWith("@carpoint.it")) {
             context.res = {
                 status: 403,
                 body: "Access denied: only @carpoint.it accounts allowed"
@@ -42,29 +53,32 @@ module.exports = async function (context, req) {
         }
 
         // -------------------------------
-        // 2. Get Azure AD token
+        // 3. Get Azure AD token
         // -------------------------------
-        const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                grant_type: "client_credentials",
-                client_id: clientId,
-                client_secret: clientSecret,
-                scope: "https://analysis.windows.net/powerbi/api/.default"
-            })
-        });
+        const tokenResponse = await fetch(
+            `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    grant_type: "client_credentials",
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    scope: "https://analysis.windows.net/powerbi/api/.default"
+                })
+            }
+        );
 
         const tokenData = await tokenResponse.json();
 
         if (!tokenData.access_token) {
-            throw new Error(JSON.stringify(tokenData));
+            throw new Error("Failed to get Azure AD token: " + JSON.stringify(tokenData));
         }
 
         const accessToken = tokenData.access_token;
 
         // -------------------------------
-        // 3. Get report details
+        // 4. Get report details
         // -------------------------------
         const reportResponse = await fetch(
             `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}`,
@@ -76,11 +90,11 @@ module.exports = async function (context, req) {
         const reportData = await reportResponse.json();
 
         if (!reportData.id) {
-            throw new Error(JSON.stringify(reportData));
+            throw new Error("Failed to get report: " + JSON.stringify(reportData));
         }
 
         // -------------------------------
-        // 4. Generate embed token (WITH RLS)
+        // 5. Generate embed token (RLS)
         // -------------------------------
         const embedTokenResponse = await fetch(
             `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}/GenerateToken`,
@@ -94,7 +108,7 @@ module.exports = async function (context, req) {
                     accessLevel: "View",
                     identities: [
                         {
-                            username: email,
+                            username: userEmail,
                             roles: ["Sales_Role"], // must match Power BI role
                             datasets: [reportData.datasetId]
                         }
@@ -106,11 +120,11 @@ module.exports = async function (context, req) {
         const embedData = await embedTokenResponse.json();
 
         if (!embedData.token) {
-            throw new Error(JSON.stringify(embedData));
+            throw new Error("Failed to generate embed token: " + JSON.stringify(embedData));
         }
 
         // -------------------------------
-        // 5. Return to frontend
+        // 6. Return to frontend
         // -------------------------------
         context.res = {
             status: 200,
@@ -122,6 +136,8 @@ module.exports = async function (context, req) {
         };
 
     } catch (error) {
+        context.log("ERROR:", error.message);
+
         context.res = {
             status: 500,
             body: error.message
