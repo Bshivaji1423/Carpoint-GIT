@@ -126,13 +126,44 @@
     // =============================
     // LOAD POWER BI REPORT
     // =============================
-    async function loadReport() {
+     async function loadReport() {
         try {
-            const response = await fetch("/api/getEmbedToken");
+    
+            // 🔴 Get logged-in account
+            const account = msalInstance.getAllAccounts()[0];
+    
+            if (!account) {
+                console.error("No account found");
+                return;
+            }
+    
+            // 🔴 Get token from MSAL
+            const tokenResponse = await msalInstance.acquireTokenSilent({
+                scopes: ["User.Read"],
+                account: account
+            });
+    
+            // 🔴 Call backend WITH token
+            const response = await fetch("/api/getEmbedToken", {
+                headers: {
+                    Authorization: `Bearer ${tokenResponse.accessToken}`
+                }
+            });
+    
+            if (!response.ok) {
+                const text = await response.text();
+                console.error("API error:", text);
+    
+                document.getElementById("reportContainer").innerHTML =
+                    "<h3 style='padding:20px'>Access denied</h3>";
+    
+                return;
+            }
+    
             const data = await response.json();
-
+    
             const models = window['powerbi-client'].models;
-
+    
             const embedConfig = {
                 type: 'report',
                 tokenType: models.TokenType.Embed,
@@ -147,10 +178,12 @@
                     layoutType: models.LayoutType.FitToPage
                 }
             };
-
+    
             const container = document.getElementById("reportContainer");
+    
+            powerbi.reset(container); // prevent duplicate embed
             powerbi.embed(container, embedConfig);
-
+    
         } catch (err) {
             console.error("Report load failed:", err);
         }
