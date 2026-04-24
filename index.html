@@ -13,6 +13,7 @@
             width: 100%;
             height: 100%;
             font-family: Arial;
+            overflow: hidden; /* 🔥 REMOVE SCROLL */
         }
 
         /* APP */
@@ -64,12 +65,17 @@
             width: 100%;
             height: calc(100vh - 70px);
         }
+
+        /* REMOVE iframe scroll */
+        #reportContainer iframe {
+            border: none;
+        }
     </style>
 </head>
 
 <body>
 
-<!-- 🔴 ACCESS DENIED (NO HEADER) -->
+<!-- 🔴 ACCESS DENIED -->
 <div id="denied">
 
     <div style="
@@ -81,7 +87,7 @@
         <img src="/logo_carpoint.png" style="height:40px;">
     </div>
 
-    <h2 style="color:#1f4e79;">Access Denied</h2>
+    <h2 style="color:#1f4e79;">⛔ Access Denied</h2>
 
     <p style="color:#555; max-width:400px;">
         This application is restricted to Carpoint users only.<br>
@@ -105,8 +111,7 @@
         <div class="right">
             <span id="username"></span>
 
-            <a id="logoutBtn"
-               href="/.auth/logout?post_logout_redirect_uri=/logged-out.html"
+            <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html"
                class="btn">
                 Logout
             </a>
@@ -128,7 +133,7 @@ async function init() {
         const res = await fetch('/.auth/me');
         const data = await res.json();
 
-        // 🔴 NOT LOGGED IN → REDIRECT TO MICROSOFT LOGIN
+        // 🔴 NOT LOGGED IN
         if (!data.clientPrincipal) {
             window.location.href = "/.auth/login/aad";
             return;
@@ -166,7 +171,6 @@ async function loadReport() {
         }
 
         const data = await response.json();
-
         const models = window['powerbi-client'].models;
 
         const config = {
@@ -174,7 +178,17 @@ async function loadReport() {
             tokenType: models.TokenType.Embed,
             accessToken: data.accessToken,
             embedUrl: data.embedUrl,
-            id: data.reportId
+            id: data.reportId,
+
+            settings: {
+                panes: {
+                    filters: { visible: false },
+                    pageNavigation: { visible: false }
+                },
+                navContentPaneEnabled: false,
+                layoutType: models.LayoutType.FitToPage,
+                background: models.BackgroundType.Transparent
+            }
         };
 
         const container = document.getElementById("reportContainer");
