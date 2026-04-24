@@ -72,10 +72,19 @@ const msalInstance = new msal.PublicClientApplication(msalConfig);
 let reportLoaded = false;
 
 // ================= LOGIN =================
-function login() {
-    msalInstance.loginRedirect({
-        scopes: ["User.Read"]
-    });
+async function login() {
+    try {
+        const response = await msalInstance.loginPopup({
+            scopes: ["User.Read"]
+        });
+
+        msalInstance.setActiveAccount(response.account);
+
+        loadUser();
+
+    } catch (err) {
+        console.error("Login error:", err);
+    }
 }
 
 // ================= LOGOUT =================
@@ -165,17 +174,7 @@ async function loadReport(account) {
 
 // ================= INIT =================
 msalInstance.initialize().then(() => {
-
-    msalInstance.handleRedirectPromise().then((response) => {
-
-        if (response) {
-            msalInstance.setActiveAccount(response.account);
-        }
-
-        loadUser();
-
-    });
-
+    loadUser();
 });
 
 </script>
