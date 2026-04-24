@@ -6,16 +6,13 @@
     <!-- Power BI -->
     <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
 
-    <!-- MSAL -->
-    <script src="https://alcdn.msauth.net/browser/2.37.0/js/msal-browser.min.js"></script>
-
     <style>
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            font-family: Arial, sans-serif;
+            font-family: Arial;
         }
 
         .header {
@@ -30,13 +27,12 @@
 
         .logo { height: 40px; }
 
-        .right button {
+        .right a {
             margin-left: 10px;
             padding: 6px 10px;
-            border: none;
             background: white;
             color: #1f4e79;
-            cursor: pointer;
+            text-decoration: none;
             font-weight: bold;
         }
 
@@ -54,8 +50,8 @@
 
     <div class="right">
         <span id="username">Loading...</span>
-        <button id="loginBtn" onclick="login()">Login</button>
-        <button id="logoutBtn" onclick="logout()">Logout</button>
+        <a href="/.auth/login/aad">Login</a>
+        <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html">Logout</a>
     </div>
 </div>
 
@@ -63,133 +59,52 @@
 
 <script>
 
-const msalConfig = {
-    auth: {
-        clientId: "0ce2d6b1-f1fc-4d5a-8f14-ea99c6a2cca4",
-        authority: "https://login.microsoftonline.com/1113460a-1574-4516-95b0-02c76e168800",
-        redirectUri: window.location.origin
-    }
-};
+// ================= GET USER =================
+async function getUser() {
+    const res = await fetch('/.auth/me');
+    const data = await res.json();
 
-const msalInstance = new msal.PublicClientApplication(msalConfig);
+    if (data.clientPrincipal) {
+        document.getElementById("username").innerText =
+            data.clientPrincipal.userDetails;
 
-let reportLoaded = false;
-
-// ================= LOGIN =================
-async function login() {
-    try {
-        const response = await msalInstance.loginPopup({
-            scopes: ["User.Read"]
-        });
-
-        msalInstance.setActiveAccount(response.account);
-
-        loadUser();
-
-    } catch (err) {
-        console.error("Login error:", err);
-    }
-}
-
-// ================= LOGOUT =================
-function logout() {
-    msalInstance.logoutPopup();
-    location.reload();
-}
-
-// ================= LOAD USER =================
-function loadUser() {
-
-    let account = msalInstance.getActiveAccount();
-
-    if (!account) {
-        const accounts = msalInstance.getAllAccounts();
-        if (accounts.length > 0) {
-            account = accounts[0];
-            msalInstance.setActiveAccount(account);
-        }
-    }
-
-    if (account) {
-
-        document.getElementById("username").innerText = account.username;
-
-        if (!reportLoaded) {
-            reportLoaded = true;
-            loadReport(account);
-        }
-
+        loadReport();
     } else {
         document.getElementById("username").innerText = "Not logged in";
     }
 }
 
 // ================= LOAD REPORT =================
-async function loadReport(account) {
+async function loadReport() {
 
-    try {
+    const response = await fetch("/api/getEmbedToken");
 
-        let tokenResponse;
-
-        try {
-            tokenResponse = await msalInstance.acquireTokenSilent({
-                scopes: ["User.Read"],
-                account: account
-            });
-        } catch {
-            tokenResponse = await msalInstance.acquireTokenPopup({
-                scopes: ["User.Read"]
-            });
-        }
-
-        const response = await fetch("/api/getEmbedToken", {
-            headers: {
-                Authorization: `Bearer ${tokenResponse.accessToken}`
-            }
-        });
-
-        if (!response.ok) {
-            const text = await response.text();
-            console.error("API error:", text);
-
-            document.getElementById("reportContainer").innerHTML =
-                "<h3 style='padding:20px'>Access denied</h3>";
-            return;
-        }
-
-        const data = await response.json();
-
-        const models = window['powerbi-client'].models;
-
-        const embedConfig = {
-            type: 'report',
-            tokenType: models.TokenType.Embed,
-            accessToken: data.accessToken,
-            embedUrl: data.embedUrl,
-            id: data.reportId,
-            settings: {
-                panes: {
-                    filters: { visible: false },
-                    pageNavigation: { visible: false }
-                },
-                layoutType: models.LayoutType.FitToPage
-            }
-        };
-
-        const container = document.getElementById("reportContainer");
-
-        powerbi.reset(container);
-        powerbi.embed(container, embedConfig);
-
-    } catch (err) {
-        console.error("Report load failed:", err);
+    if (!response.ok) {
+        document.getElementById("reportContainer").innerHTML =
+            "<h3 style='padding:20px'>Access denied</h3>";
+        return;
     }
+
+    const data = await response.json();
+
+    const models = window['powerbi-client'].models;
+
+    const embedConfig = {
+        type: 'report',
+        tokenType: models.TokenType.Embed,
+        accessToken: data.accessToken,
+        embedUrl: data.embedUrl,
+        id: data.reportId
+    };
+
+    const container = document.getElementById("reportContainer");
+
+    powerbi.reset(container);
+    powerbi.embed(container, embedConfig);
 }
 
-// ================= INIT =================
-msalInstance.initialize().then(() => {
-    loadUser();
-});
+// INIT
+getUser();
 
 </script>
 
