@@ -1,5 +1,3 @@
-const jwt = require("jsonwebtoken");
-
 module.exports = async function (context, req) {
 
     const tenantId = process.env.TENANT_ID;
@@ -10,38 +8,38 @@ module.exports = async function (context, req) {
 
     try {
 
-        // -------------------------------
-        // 1. Get user from MSAL token
-        // -------------------------------
-        const authHeader = req.headers.authorization;
+        // ================================
+        // 1. Get logged-in user (SWA)
+        // ================================
+        const principal = req.headers["x-ms-client-principal"];
 
-        if (!authHeader) {
+        if (!principal) {
             context.res = {
                 status: 401,
-                body: "Missing token"
+                body: "User not authenticated"
             };
             return;
         }
 
-        const token = authHeader.split(" ")[1];
+        const decoded = JSON.parse(
+            Buffer.from(principal, "base64").toString("ascii")
+        );
 
-        const decoded = jwt.decode(token);
+        const userEmail = decoded.userDetails?.toLowerCase();
 
-        const userEmail = decoded?.preferred_username?.toLowerCase();
-
-        context.log("User email:", userEmail);
+        context.log("User:", userEmail);
 
         if (!userEmail) {
             context.res = {
                 status: 401,
-                body: "Invalid token"
+                body: "Invalid user"
             };
             return;
         }
 
-        // -------------------------------
-        // 2. Restrict domain
-        // -------------------------------
+        // ================================
+        // 2. BLOCK external users
+        // ================================
         if (!userEmail.endsWith("@carpoint.it")) {
             context.res = {
                 status: 403,
@@ -50,9 +48,9 @@ module.exports = async function (context, req) {
             return;
         }
 
-        // -------------------------------
-        // 3. Get Azure AD token (Power BI)
-        // -------------------------------
+        // ================================
+        // 3. Get Power BI access token
+        // ================================
         const tokenResponse = await fetch(
             `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
             {
@@ -75,9 +73,9 @@ module.exports = async function (context, req) {
 
         const accessToken = tokenData.access_token;
 
-        // -------------------------------
-        // 4. Get report
-        // -------------------------------
+        // ================================
+        // 4. Get report info
+        // ================================
         const reportResponse = await fetch(
             `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}`,
             {
@@ -87,9 +85,9 @@ module.exports = async function (context, req) {
 
         const reportData = await reportResponse.json();
 
-        // -------------------------------
+        // ================================
         // 5. Generate embed token
-        // -------------------------------
+        // ================================
         const embedTokenResponse = await fetch(
             `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}/GenerateToken`,
             {
@@ -103,7 +101,7 @@ module.exports = async function (context, req) {
                     identities: [
                         {
                             username: userEmail,
-                            roles: ["Sales_Role"],
+                            roles: ["Sales_Role"],   // keep only if using RLS
                             datasets: [reportData.datasetId]
                         }
                     ]
@@ -113,6 +111,13 @@ module.exports = async function (context, req) {
 
         const embedData = await embedTokenResponse.json();
 
+        if (!embedData.token) {
+            throw new Error(JSON.stringify(embedData));
+        }
+
+        // ================================
+        // 6. Return to frontend
+        // ================================
         context.res = {
             status: 200,
             body: {
@@ -123,6 +128,7 @@ module.exports = async function (context, req) {
         };
 
     } catch (error) {
+
         context.log("ERROR:", error.message);
 
         context.res = {
