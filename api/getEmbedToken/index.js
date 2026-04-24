@@ -3,7 +3,6 @@
 <head>
     <title>Inevaso Report</title>
 
-    <!-- Power BI -->
     <script src="https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js"></script>
 
     <style>
@@ -13,6 +12,22 @@
             width: 100%;
             height: 100%;
             font-family: Arial;
+        }
+
+        /* HIDDEN BY DEFAULT */
+        #app {
+            display: none;
+            height: 100%;
+        }
+
+        /* ACCESS DENIED SCREEN */
+        #denied {
+            display: none;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
         }
 
         .header {
@@ -29,11 +44,6 @@
             height: 40px;
         }
 
-        .right {
-            display: flex;
-            align-items: center;
-        }
-
         .right a {
             margin-left: 10px;
             padding: 6px 10px;
@@ -46,74 +56,84 @@
         #reportContainer {
             width: 100%;
             height: calc(100vh - 70px);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 18px;
-            color: #555;
         }
     </style>
 </head>
 
 <body>
 
-<div class="header">
-    <img src="/logo_carpoint.png" class="logo">
-
-    <div class="right">
-        <span id="username">Checking user...</span>
-
-        <!-- Tenant-restricted login -->
-        <a href="/.auth/login/aad?tenantId=1113460a-1574-4516-95b0-02c76e168800">
-            Login
-        </a>
-
-        <!-- Logout with reason=user -->
-        <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html?reason=user">
-            Logout
-        </a>
-    </div>
+<!-- 🔴 ACCESS DENIED -->
+<div id="denied">
+    ⛔ Access Denied
 </div>
 
-<div id="reportContainer">
-    Loading report...
+<!-- ✅ FULL APP -->
+<div id="app">
+
+    <div class="header">
+        <img src="/logo_carpoint.png" class="logo">
+
+        <div class="right">
+            <span id="username"></span>
+
+            <a href="/.auth/login/aad?tenantId=1113460a-1574-4516-95b0-02c76e168800">Login</a>
+
+            <a href="/.auth/logout?post_logout_redirect_uri=/logged-out.html">
+                Logout
+            </a>
+        </div>
+    </div>
+
+    <div id="reportContainer"></div>
+
 </div>
 
 <script>
 
-// ================= GET USER =================
-async function getUser() {
+// ================= INIT =================
+init();
+
+async function init() {
+
     try {
-        const res = await fetch('/.auth/me');
-        const data = await res.json();
+        const userRes = await fetch('/.auth/me');
+        const userData = await userRes.json();
 
-        if (data.clientPrincipal) {
-            const user = data.clientPrincipal.userDetails;
-            document.getElementById("username").innerText = user;
-
-            loadReport();
-        } else {
-            document.getElementById("username").innerText = "Not logged in";
+        // Not logged in
+        if (!userData.clientPrincipal) {
+            showDenied();
+            return;
         }
+
+        const userEmail = userData.clientPrincipal.userDetails.toLowerCase();
+
+        // 🔴 BLOCK EXTERNAL USERS HERE (frontend guard)
+        if (!userEmail.endsWith("@carpoint.it")) {
+            showDenied();
+            return;
+        }
+
+        // ✅ SHOW APP
+        document.getElementById("app").style.display = "block";
+        document.getElementById("username").innerText = userEmail;
+
+        // Load report
+        loadReport();
+
     } catch (err) {
-        console.error("User load error:", err);
-        document.getElementById("username").innerText = "Error loading user";
+        console.error(err);
+        showDenied();
     }
 }
 
 // ================= LOAD REPORT =================
 async function loadReport() {
 
-    const container = document.getElementById("reportContainer");
-    container.innerText = "Loading report...";
-
     try {
         const response = await fetch("/api/getEmbedToken");
 
-        // 🔴 If user is not allowed → force logout with reason=external
         if (!response.ok) {
-            window.location.href =
-                "/.auth/logout?post_logout_redirect_uri=/logged-out.html?reason=external";
+            showDenied();
             return;
         }
 
@@ -121,7 +141,7 @@ async function loadReport() {
 
         const models = window['powerbi-client'].models;
 
-        const embedConfig = {
+        const config = {
             type: 'report',
             tokenType: models.TokenType.Embed,
             accessToken: data.accessToken,
@@ -129,17 +149,22 @@ async function loadReport() {
             id: data.reportId
         };
 
+        const container = document.getElementById("reportContainer");
+
         powerbi.reset(container);
-        powerbi.embed(container, embedConfig);
+        powerbi.embed(container, config);
 
     } catch (err) {
-        console.error("Report load error:", err);
-        container.innerText = "Error loading report";
+        console.error(err);
+        showDenied();
     }
 }
 
-// ================= INIT =================
-getUser();
+// ================= ACCESS DENIED =================
+function showDenied() {
+    document.getElementById("denied").style.display = "flex";
+    document.getElementById("app").style.display = "none";
+}
 
 </script>
 
