@@ -86,8 +86,23 @@ module.exports = async function (context, req) {
         const reportData = await reportResponse.json();
 
         // ================================
-        // 5. Generate embed token
+        // 5. Determine RLS role
         // ================================
+        
+        const puntoVenditaUsers = [
+            "sgalletti@carpoint.it"
+        ];
+        
+        const userRole = puntoVenditaUsers.includes(userEmail)
+            ? "PuntoVendita_Role"
+            : "Sales_Role";
+        
+        context.log("Assigned RLS Role:", userRole);
+        
+        // ================================
+        // 6. Generate embed token
+        // ================================
+        
         const embedTokenResponse = await fetch(
             `https://api.powerbi.com/v1.0/myorg/groups/${workspaceId}/reports/${reportId}/GenerateToken`,
             {
@@ -101,19 +116,13 @@ module.exports = async function (context, req) {
                     identities: [
                         {
                             username: userEmail,
-                            roles: ["Sales_Role"],   // keep only if using RLS
+                            roles: [userRole],
                             datasets: [reportData.datasetId]
                         }
                     ]
                 })
             }
         );
-
-        const embedData = await embedTokenResponse.json();
-
-        if (!embedData.token) {
-            throw new Error(JSON.stringify(embedData));
-        }
 
         // ================================
         // 6. Return to frontend
