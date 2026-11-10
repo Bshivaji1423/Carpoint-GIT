@@ -89,7 +89,8 @@ module.exports = async function (context, req) {
         // 5. Determine RLS role
         // ================================
         const puntoVenditaUsers = [
-            "sgalletti@carpoint.it"
+            "sgalletti@carpoint.it", 
+            "sbodige@carpoint.it"
         ];
 
         const userRole = puntoVenditaUsers.includes(userEmail)
