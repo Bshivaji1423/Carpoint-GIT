@@ -97,6 +97,7 @@ module.exports = async function (context, req) {
             ? "PuntoVendita_Role"
             : "Sales_Role";
         
+        context.log("User email received:", userEmail);
         context.log("Assigned RLS Role:", userRole);
         
         // ================================
@@ -123,6 +124,12 @@ module.exports = async function (context, req) {
                 })
             }
         );
+        
+        const embedData = await embedTokenResponse.json();
+        
+        if (!embedData.token) {
+            throw new Error(JSON.stringify(embedData));
+        }
 
         // ================================
         // 6. Return to frontend
